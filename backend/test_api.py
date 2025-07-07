@@ -27,9 +27,10 @@ def test_upload_chunks():
     with open("../sample_data/sample_chunks.json", "r") as f:
         chunks = json.load(f)
     
-    # Prepare upload request - just the chunks
+    # Prepare upload request - chunks and schema version
     upload_data = {
-        "chunks": chunks
+        "chunks": chunks,
+        "schema_version": "1.0"
     }
     
     # Make PUT request
@@ -49,7 +50,8 @@ def test_upload_local_file():
     
     # Use the local sample file
     upload_data = {
-        "file_path": "../sample_data/sample_chunks.json"
+        "file_path": "../sample_data/sample_chunks.json",
+        "schema_version": "1.0"
     }
     
     # Make PUT request
@@ -69,7 +71,8 @@ def test_upload_url():
     
     # Example with a hypothetical URL (you'd need a real URL)
     upload_data = {
-        "file_path": "https://example.com/sample_chunks.json"
+        "file_path": "https://example.com/sample_chunks.json",
+        "schema_version": "1.0"
     }
     
     # Make PUT request
@@ -89,7 +92,8 @@ def test_upload_google_drive():
     
     # Example Google Drive sharing URL (you'd need a real one)
     upload_data = {
-        "file_path": "https://drive.google.com/file/d/1ABC123DEF456/view?usp=sharing"
+        "file_path": "https://drive.google.com/file/d/1ABC123DEF456/view?usp=sharing",
+        "schema_version": "1.0"
     }
     
     # Make PUT request

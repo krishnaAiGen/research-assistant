@@ -74,6 +74,7 @@ GET http://localhost:8000/api/stats
 - Google Drive sharing URL (automatically converted to direct download)
 
 **Important Notes:**
+- **schema_version is REQUIRED** for all upload requests
 - Processing happens asynchronously in the background
 - Returns 202 Accepted immediately
 - Wait 5-10 seconds after upload before searching
@@ -103,14 +104,15 @@ Content-Type: application/json
       "text": "Velvet bean–Mucuna pruriens var. utilis, also known as mucuna—is a twining annual leguminous vine common to most parts of the tropics...",
       "doi": "10.1234/example.doi"
     }
-  ]
+  ],
+  "schema_version": "1.0"
 }
 ```
 
 **Response (202 Accepted):**
 ```json
 {
-  "message": "Direct chunks accepted for processing (15 chunks)",
+  "message": "Direct chunks accepted for processing (15 chunks) with schema v1.0",
   "status": "accepted",
   "processing_type": "direct_chunks"
 }
@@ -123,14 +125,15 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
-  "file_path": "/Users/krishnayadav/Downloads/Sample_chunks.json"
+  "file_path": "/Users/krishnayadav/Downloads/Sample_chunks.json",
+  "schema_version": "1.0"
 }
 ```
 
 **Response (202 Accepted):**
 ```json
 {
-  "message": "local file accepted for processing",
+  "message": "local file accepted for processing with schema v1.0",
   "status": "accepted",
   "processing_type": "local_file"
 }
@@ -141,14 +144,15 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
-  "file_path": "https://example.com/sample_chunks.json"
+  "file_path": "https://example.com/sample_chunks.json",
+  "schema_version": "1.0"
 }
 ```
 
 **Response (202 Accepted):**
 ```json
 {
-  "message": "URL accepted for processing",
+  "message": "URL accepted for processing with schema v1.0",
   "status": "accepted",
   "processing_type": "url"
 }
@@ -164,18 +168,23 @@ Content-Type: application/json
 **Request Body:**
 ```json
 {
-  "file_path": "https://drive.google.com/file/d/1ABC123DEF456/view?usp=sharing"
+  "file_path": "https://drive.google.com/file/d/1ABC123DEF456/view?usp=sharing",
+  "schema_version": "1.0"
 }
 ```
 
 **Response (202 Accepted):**
 ```json
 {
-  "message": "Google Drive URL accepted for processing",
+  "message": "Google Drive URL accepted for processing with schema v1.0",
   "status": "accepted",
   "processing_type": "google_drive_url"
 }
 ```
+
+**Required Fields:**
+- `schema_version` (string): **REQUIRED** - Version of the data schema being used
+- Either `chunks` OR `file_path` (but not both)
 
 **Chunk Schema:**
 Each chunk must contain the following fields:
@@ -259,7 +268,8 @@ Content-Type: application/json
       "link": "https://cgspace.cgiar.org/server/api/core/bitstreams/68bfaec0-8d32-4567-9133-7df9ec7f3e23/content",
       "text": "Velvet bean–Mucuna pruriens var. utilis, also known as mucuna—is a twining annual leguminous vine...",
       "score": 0.85,
-      "doi": "10.1234/example.doi"
+      "doi": "10.1234/example.doi",
+      "schema_version": "1.0"
     }
   ],
   "total_results": 1,
@@ -302,7 +312,8 @@ GET http://localhost:8000/api/extension_brief_mucuna.pdf
       "attributes": ["Botanical description", "Morphology"],
       "link": "https://cgspace.cgiar.org/server/api/core/bitstreams/68bfaec0-8d32-4567-9133-7df9ec7f3e23/content",
       "text": "Velvet bean–Mucuna pruriens var. utilis...",
-      "doi": "10.1234/example.doi"
+      "doi": "10.1234/example.doi",
+      "schema_version": "1.0"
     }
   ],
   "metadata": {
@@ -349,7 +360,7 @@ GET http://localhost:8000/api/extension_brief_mucuna.pdf
 {
   "detail": [
     {
-      "loc": ["body", "chunks", 0, "id"],
+      "loc": ["body", "schema_version"],
       "msg": "field required",
       "type": "value_error.missing"
     }
@@ -374,9 +385,9 @@ GET http://localhost:8000/api/extension_brief_mucuna.pdf
 # 1. Check health
 GET http://localhost:8000/
 
-# 2. Upload sample data
+# 2. Upload sample data (schema_version required)
 PUT http://localhost:8000/api/upload
-# Body: {"chunks": [...]}
+# Body: {"chunks": [...], "schema_version": "1.0"}
 
 # 3. Wait 5-10 seconds for background processing
 
@@ -395,15 +406,15 @@ GET http://localhost:8000/api/extension_brief_mucuna.pdf
 ```bash
 # Local file (absolute path required)
 PUT http://localhost:8000/api/upload
-# Body: {"file_path": "/Users/username/Documents/chunks.json"}
+# Body: {"file_path": "/Users/username/Documents/chunks.json", "schema_version": "1.0"}
 
 # URL
 PUT http://localhost:8000/api/upload
-# Body: {"file_path": "https://example.com/chunks.json"}
+# Body: {"file_path": "https://example.com/chunks.json", "schema_version": "1.0"}
 
 # Google Drive
 PUT http://localhost:8000/api/upload
-# Body: {"file_path": "https://drive.google.com/file/d/FILE_ID/view"}
+# Body: {"file_path": "https://drive.google.com/file/d/FILE_ID/view", "schema_version": "1.0"}
 
 # Always wait 5-10 seconds after upload before searching
 ```
@@ -458,6 +469,7 @@ python run.py
 - `INFO: Will watch for changes in these directories` - Normal uvicorn auto-reload message
 - `INFO: Started server process` - Server is starting
 - `INFO: Waiting for application startup` - Server is ready
+- `Processing upload with schema version: 1.0` - Schema version logging
 
 ### 3. Test with Sample Data
 ```bash
@@ -467,6 +479,12 @@ python test_api.py
 ---
 
 ## 📊 Technical Details
+
+### Schema Version
+- **Purpose:** Track data format versions for compatibility
+- **Storage:** Stored as metadata with each chunk
+- **Retrieval:** Included in search results and document retrieval
+- **Default:** "1.0" if not specified in existing data
 
 ### Embedding Model
 - **Model:** OpenAI text-embedding-ada-002
@@ -486,6 +504,7 @@ python test_api.py
 - **Auto Cleanup:** Temporary downloaded files automatically deleted
 - **File Support:** JSON files with chunk arrays
 - **URL Handling:** Smart detection and conversion (especially Google Drive)
+- **Schema Tracking:** Version information stored with each chunk
 
 ### Performance
 - **Concurrent Uploads:** Multiple uploads can be processed simultaneously
@@ -526,25 +545,29 @@ POST http://localhost:8000/api/similarity_search
 
 ### Common Issues
 
-1. **"Method Not Allowed" Error**
+1. **"schema_version field required" Error**
+   - Always include `schema_version` in upload requests
+   - Use "1.0" as default version
+
+2. **"Method Not Allowed" Error**
    - Check HTTP method (PUT for upload, POST for search)
    - Ensure correct endpoint URL
 
-2. **"File not found" Error**
+3. **"File not found" Error**
    - Use absolute file paths for local files
    - Verify file exists and is readable
 
-3. **Empty Search Results**
+4. **Empty Search Results**
    - Wait 5-10 seconds after upload for processing
    - Check if chunks were uploaded using `/api/stats`
    - Lower `min_score` parameter
 
-4. **Google Drive Download Issues**
+5. **Google Drive Download Issues**
    - Ensure file is publicly accessible
    - Check if sharing is enabled
    - Try direct download URL format
 
-5. **OpenAI API Errors**
+6. **OpenAI API Errors**
    - Verify API key is set correctly
    - Check API quota and billing
    - Ensure text chunks are not too long
@@ -554,11 +577,13 @@ When `DEBUG=True` in environment:
 - Auto-reload enabled (server restarts on code changes)
 - Detailed logging and error messages
 - File watching enabled
+- Schema version logging in console
 
 ---
 
 ## 📝 Notes
 
+- **schema_version is REQUIRED** for all upload requests
 - Upload processing is always asynchronous (202 Accepted response)
 - Similarity scores are computed from L2 distance: `score = 1 / (1 + distance)`
 - Google Drive URLs are automatically converted to direct download format
@@ -566,4 +591,16 @@ When `DEBUG=True` in environment:
 - Only downloaded files from URLs are automatically cleaned up
 - ChromaDB may show duplicate ID warnings on re-uploads (this is normal)
 - Server logs "Will watch for changes" message is normal uvicorn behavior in debug mode
-- Similarity scores range from 0.0 to 1.0 (higher = more similar) 
+- Schema version is stored with each chunk and returned in search results
+- Existing data without schema_version will default to "1.0"
+
+---
+
+## 🔄 Migration Notes
+
+### From Previous Versions
+If you have existing data without schema_version:
+1. Existing chunks will automatically get schema_version "1.0"
+2. New uploads MUST include schema_version
+3. All API responses now include schema_version field
+4. No data migration required - handled automatically

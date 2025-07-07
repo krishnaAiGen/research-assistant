@@ -18,6 +18,7 @@ class JournalChunk(BaseModel):
 class UploadRequest(BaseModel):
     chunks: Optional[List[JournalChunk]] = None
     file_path: Optional[str] = None
+    schema_version: str = Field(description="Schema version for the data format")
     
     @validator('chunks', 'file_path')
     def validate_chunks_or_file_path(cls, v, values):
