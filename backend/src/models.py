@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from typing import List, Optional, Union
 from datetime import datetime
 
@@ -16,12 +16,30 @@ class JournalChunk(BaseModel):
     doi: Optional[str] = None
 
 class UploadRequest(BaseModel):
-    chunks: List[JournalChunk]
+    chunks: Optional[List[JournalChunk]] = None
+    file_path: Optional[str] = None
+    
+    @validator('chunks', 'file_path')
+    def validate_chunks_or_file_path(cls, v, values):
+        chunks = values.get('chunks') if 'chunks' in values else v
+        file_path = values.get('file_path') if 'file_path' in values else None
+        
+        # If this is the file_path field being validated
+        if v is not None and isinstance(v, str):
+            file_path = v
+        
+        # Check that exactly one of chunks or file_path is provided
+        if chunks is not None and file_path is not None:
+            raise ValueError('Provide either chunks or file_path, not both')
+        if chunks is None and file_path is None:
+            raise ValueError('Must provide either chunks or file_path')
+        
+        return v
 
 class UploadResponse(BaseModel):
     message: str
-    chunks_processed: int
     status: str = "accepted"
+    processing_type: str
 
 class SimilaritySearchRequest(BaseModel):
     query: str
