@@ -20,8 +20,8 @@ def test_health_check():
     print()
 
 def test_upload_chunks():
-    """Test uploading chunks to the API"""
-    print("Testing chunk upload...")
+    """Test uploading chunks directly to the API"""
+    print("Testing direct chunk upload...")
     
     # Load sample data
     with open("../sample_data/sample_chunks.json", "r") as f:
@@ -42,6 +42,66 @@ def test_upload_chunks():
     if response.status_code == 202:
         print("Waiting for background processing...")
         time.sleep(5)
+
+def test_upload_local_file():
+    """Test uploading from local file path"""
+    print("Testing local file upload...")
+    
+    # Use the local sample file
+    upload_data = {
+        "file_path": "../sample_data/sample_chunks.json"
+    }
+    
+    # Make PUT request
+    response = requests.put(f"{BASE_URL}/api/upload", json=upload_data)
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}")
+    print()
+    
+    # Wait a bit for background processing
+    if response.status_code == 202:
+        print("Waiting for background processing...")
+        time.sleep(5)
+
+def test_upload_url():
+    """Test uploading from URL"""
+    print("Testing URL upload...")
+    
+    # Example with a hypothetical URL (you'd need a real URL)
+    upload_data = {
+        "file_path": "https://example.com/sample_chunks.json"
+    }
+    
+    # Make PUT request
+    response = requests.put(f"{BASE_URL}/api/upload", json=upload_data)
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}")
+    print()
+    
+    # Wait a bit for background processing
+    if response.status_code == 202:
+        print("Waiting for background processing...")
+        time.sleep(10)  # File download might take longer
+
+def test_upload_google_drive():
+    """Test uploading from Google Drive"""
+    print("Testing Google Drive upload...")
+    
+    # Example Google Drive sharing URL (you'd need a real one)
+    upload_data = {
+        "file_path": "https://drive.google.com/file/d/1ABC123DEF456/view?usp=sharing"
+    }
+    
+    # Make PUT request
+    response = requests.put(f"{BASE_URL}/api/upload", json=upload_data)
+    print(f"Status: {response.status_code}")
+    print(f"Response: {response.json()}")
+    print()
+    
+    # Wait a bit for background processing
+    if response.status_code == 202:
+        print("Waiting for background processing...")
+        time.sleep(10)
 
 def test_similarity_search():
     """Test similarity search"""
