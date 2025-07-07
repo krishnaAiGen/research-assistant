@@ -62,26 +62,30 @@ async def upload_chunks(request: UploadRequest, background_tasks: BackgroundTask
     """
     Upload journal chunks, local file path, or URL (including Google Drive), 
     generate embeddings, and store them in the vector database.
+    Requires schema_version to be specified.
     Returns 202 Accepted as the processing happens asynchronously.
     """
     try:
+        # Log the schema version being used
+        print(f"Processing upload with schema version: {request.schema_version}")
+        
         if request.chunks:
             # Direct chunks provided
             chunks_data = [chunk.dict() for chunk in request.chunks]
             chunks_count = len(request.chunks)
             
-            # Add background task to process chunks
-            background_tasks.add_task(process_chunks, chunks_data)
+            # Add background task to process chunks with schema version
+            background_tasks.add_task(process_chunks, chunks_data, request.schema_version)
             
             return UploadResponse(
-                message=f"Direct chunks accepted for processing ({chunks_count} chunks)",
+                message=f"Direct chunks accepted for processing ({chunks_count} chunks) with schema v{request.schema_version}",
                 status="accepted",
                 processing_type="direct_chunks"
             )
             
         elif request.file_path:
             # File path provided - can be local file, URL, or Google Drive
-            background_tasks.add_task(process_file_path, request.file_path)
+            background_tasks.add_task(process_file_path, request.file_path, request.schema_version)
             
             # Determine file type for better messaging
             if request.file_path.startswith(('http://', 'https://')):
@@ -96,7 +100,7 @@ async def upload_chunks(request: UploadRequest, background_tasks: BackgroundTask
                 processing_type = "local_file"
             
             return UploadResponse(
-                message=f"{file_type} accepted for processing",
+                message=f"{file_type} accepted for processing with schema v{request.schema_version}",
                 status="accepted",
                 processing_type=processing_type
             )
@@ -107,12 +111,12 @@ async def upload_chunks(request: UploadRequest, background_tasks: BackgroundTask
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing upload: {str(e)}")
 
-async def process_chunks(chunks: List[dict]):
+async def process_chunks(chunks: List[dict], schema_version: str):
     """
     Background task to process chunks: generate embeddings and store in vector database
     """
     try:
-        print(f"Processing {len(chunks)} chunks...")
+        print(f"Processing {len(chunks)} chunks with schema version {schema_version}...")
         
         # Extract text content for embedding generation
         texts = [chunk["text"] for chunk in chunks]
@@ -123,10 +127,10 @@ async def process_chunks(chunks: List[dict]):
         
         # Store in vector database
         print("Storing in vector database...")
-        success = vector_store.add_chunks(chunks, embeddings)
+        success = vector_store.add_chunks(chunks, embeddings, schema_version)
         
         if success:
-            print(f"Successfully processed {len(chunks)} chunks")
+            print(f"Successfully processed {len(chunks)} chunks with schema v{schema_version}")
         else:
             print("Failed to store chunks in vector database")
             
@@ -152,7 +156,7 @@ def convert_google_drive_url(url: str) -> str:
     
     return url
 
-async def process_file_path(file_path: str):
+async def process_file_path(file_path: str, schema_version: str):
     """
     Background task to process file from local path, URL, or Google Drive
     """
@@ -161,7 +165,7 @@ async def process_file_path(file_path: str):
         # Determine if it's a URL or local file path
         if file_path.startswith(('http://', 'https://')):
             # It's a URL - download the file
-            print(f"Processing URL: {file_path}")
+            print(f"Processing URL: {file_path} with schema version {schema_version}")
             
             # Convert Google Drive URLs to direct download URLs
             download_url = convert_google_drive_url(file_path)
@@ -184,7 +188,7 @@ async def process_file_path(file_path: str):
             
         else:
             # It's a local file path
-            print(f"Processing local file: {file_path}")
+            print(f"Processing local file: {file_path} with schema version {schema_version}")
             
             # Check if file exists
             if not Path(file_path).exists():
@@ -203,7 +207,7 @@ async def process_file_path(file_path: str):
         print(f"Found {len(chunks_data)} chunks in file")
         
         # Process the chunks
-        await process_chunks(chunks_data)
+        await process_chunks(chunks_data, schema_version)
         
         print("File processing completed successfully")
         

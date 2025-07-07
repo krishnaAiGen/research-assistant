@@ -37,7 +37,7 @@ class ChromaVectorStore:
         
         return collection
     
-    def add_chunks(self, chunks: List[Dict[str, Any]], embeddings: List[List[float]]) -> bool:
+    def add_chunks(self, chunks: List[Dict[str, Any]], embeddings: List[List[float]], schema_version: str = "1.0") -> bool:
         """
         Add chunks with their embeddings to the vector store
         """
@@ -56,7 +56,8 @@ class ChromaVectorStore:
                     "publish_year": chunk["publish_year"],
                     "usage_count": chunk["usage_count"],
                     "attributes": json.dumps(chunk["attributes"]),
-                    "link": chunk["link"]
+                    "link": chunk["link"],
+                    "schema_version": schema_version
                 }
                 if "doi" in chunk and chunk["doi"]:
                     metadata["doi"] = chunk["doi"]
@@ -71,7 +72,7 @@ class ChromaVectorStore:
                 metadatas=metadatas
             )
             
-            print(f"Successfully added {len(chunks)} chunks to vector store")
+            print(f"Successfully added {len(chunks)} chunks to vector store with schema v{schema_version}")
             return True
             
         except Exception as e:
@@ -113,7 +114,8 @@ class ChromaVectorStore:
                         "attributes": json.loads(metadata["attributes"]),
                         "link": metadata["link"],
                         "text": text,
-                        "score": similarity_score
+                        "score": similarity_score,
+                        "schema_version": metadata.get("schema_version", "1.0")
                     }
                     
                     if "doi" in metadata:
@@ -156,7 +158,8 @@ class ChromaVectorStore:
                     "usage_count": metadata["usage_count"],
                     "attributes": json.loads(metadata["attributes"]),
                     "link": metadata["link"],
-                    "text": text
+                    "text": text,
+                    "schema_version": metadata.get("schema_version", "1.0")
                 }
                 
                 if "doi" in metadata:
