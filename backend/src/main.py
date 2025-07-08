@@ -8,23 +8,29 @@ import tempfile
 from pathlib import Path
 from dotenv import load_dotenv
 from typing import List
+from openai import OpenAI
 
 try:
     from .models import (
         UploadRequest, UploadResponse, SimilaritySearchRequest, 
-        SimilaritySearchResponse, JournalDocument, ErrorResponse
+        SimilaritySearchResponse, JournalDocument, ErrorResponse,
+        CompareRequest, CompareResponse, PaperSummary
     )
     from .embeddings import EmbeddingGenerator
     from .vector_store import ChromaVectorStore
 except ImportError:
     from models import (
         UploadRequest, UploadResponse, SimilaritySearchRequest, 
-        SimilaritySearchResponse, JournalDocument, ErrorResponse
+        SimilaritySearchResponse, JournalDocument, ErrorResponse,
+        CompareRequest, CompareResponse, PaperSummary
     )
     from embeddings import EmbeddingGenerator
     from vector_store import ChromaVectorStore
 
 load_dotenv()
+
+# Configure OpenAI client
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 app = FastAPI(
     title="Research Assistant API",
@@ -311,6 +317,158 @@ async def get_journal_document(journal_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error retrieving document: {str(e)}")
+
+async def generate_paper_summary(paper_data: dict) -> str:
+    """
+    Generate a summary of a paper using OpenAI
+    """
+    try:
+        prompt = f"""Please provide a comprehensive summary of this research paper:
+
+Title/Journal: {paper_data['journal']}
+Publication Year: {paper_data['publish_year']}
+Total Sections: {paper_data['total_chunks']}
+
+Full Text:
+{paper_data['full_text'][:15000]}  # Limit to avoid token limits
+
+Please provide a structured summary including:
+1. Main research question/objective
+2. Key methodology
+3. Main findings
+4. Conclusions
+5. Significance/implications
+
+Keep the summary concise but comprehensive (300-500 words)."""
+
+        response = openai_client.chat.completions.create(
+            model=os.getenv("OPENAI_CHAT_MODEL", "gpt-3.5-turbo"),
+            messages=[
+                {"role": "system", "content": "You are an expert research analyst. Provide clear, structured summaries of academic papers."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=800,
+            temperature=0.3
+        )
+        
+        return response.choices[0].message.content.strip()
+        
+    except Exception as e:
+        print(f"Error generating summary: {str(e)}")
+        return f"Error generating summary for this paper: {str(e)}"
+
+async def generate_comparison(paper1_data: dict, paper2_data: dict, summary1: str, summary2: str) -> str:
+    """
+    Generate a comparison between two papers using OpenAI
+    """
+    try:
+        prompt = f"""Compare these two research papers:
+
+PAPER 1:
+Journal: {paper1_data['journal']} ({paper1_data['publish_year']})
+Summary: {summary1}
+
+PAPER 2:
+Journal: {paper2_data['journal']} ({paper2_data['publish_year']})
+Summary: {summary2}
+
+Please provide a detailed comparison covering:
+1. Research objectives/questions - similarities and differences
+2. Methodological approaches - how they differ or align
+3. Key findings - complementary or conflicting results
+4. Scope and focus areas
+5. Temporal context (publication years and their significance)
+6. Potential for cross-referencing or building upon each other
+
+Structure your comparison to highlight both similarities and differences, and discuss how these papers might relate to each other in the broader research landscape."""
+
+        response = openai_client.chat.completions.create(
+            model=os.getenv("OPENAI_CHAT_MODEL", "gpt-3.5-turbo"),
+            messages=[
+                {"role": "system", "content": "You are an expert research analyst specializing in comparative analysis of academic papers."},
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=1200,
+            temperature=0.3
+        )
+        
+        return response.choices[0].message.content.strip()
+        
+    except Exception as e:
+        print(f"Error generating comparison: {str(e)}")
+        return f"Error generating comparison: {str(e)}"
+
+@app.post("/api/compare", response_model=CompareResponse)
+async def compare_papers(request: CompareRequest):
+    """
+    Compare two research papers by generating summaries and a comparison analysis.
+    Takes two source_doc_ids and returns summaries for each paper plus a comparison.
+    """
+    try:
+        print(f"Comparing papers: {request.source_doc_id_1} vs {request.source_doc_id_2}")
+        
+        # Get full text for both papers
+        paper1_data = vector_store.get_document_full_text(request.source_doc_id_1)
+        paper2_data = vector_store.get_document_full_text(request.source_doc_id_2)
+        
+        # Check if both papers exist
+        if not paper1_data:
+            raise HTTPException(status_code=404, detail=f"Paper with ID '{request.source_doc_id_1}' not found")
+        
+        if not paper2_data:
+            raise HTTPException(status_code=404, detail=f"Paper with ID '{request.source_doc_id_2}' not found")
+        
+        print(f"Retrieved paper 1: {paper1_data['journal']} ({paper1_data['publish_year']})")
+        print(f"Retrieved paper 2: {paper2_data['journal']} ({paper2_data['publish_year']})")
+        
+        # Generate summaries for both papers
+        print("Generating summary for paper 1...")
+        summary1 = await generate_paper_summary(paper1_data)
+        
+        print("Generating summary for paper 2...")
+        summary2 = await generate_paper_summary(paper2_data)
+        
+        # Generate comparison
+        print("Generating comparison analysis...")
+        comparison = await generate_comparison(paper1_data, paper2_data, summary1, summary2)
+        
+        # Prepare response
+        paper1_summary = PaperSummary(
+            source_doc_id=paper1_data["source_doc_id"],
+            journal=paper1_data["journal"],
+            publish_year=paper1_data["publish_year"],
+            total_chunks=paper1_data["total_chunks"],
+            summary=summary1,
+            doi=paper1_data.get("doi")
+        )
+        
+        paper2_summary = PaperSummary(
+            source_doc_id=paper2_data["source_doc_id"],
+            journal=paper2_data["journal"],
+            publish_year=paper2_data["publish_year"],
+            total_chunks=paper2_data["total_chunks"],
+            summary=summary2,
+            doi=paper2_data.get("doi")
+        )
+        
+        request_info = {
+            "requested_papers": [request.source_doc_id_1, request.source_doc_id_2],
+            "processing_time": "Generated summaries and comparison using OpenAI",
+            "model_used": os.getenv("OPENAI_CHAT_MODEL", "gpt-3.5-turbo")
+        }
+        
+        return CompareResponse(
+            paper1_summary=paper1_summary,
+            paper2_summary=paper2_summary,
+            comparison=comparison,
+            request_info=request_info
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error in comparison: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error comparing papers: {str(e)}")
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc):

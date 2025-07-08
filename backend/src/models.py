@@ -74,6 +74,24 @@ class JournalDocument(BaseModel):
     chunks: List[JournalChunk]
     metadata: dict
 
+class CompareRequest(BaseModel):
+    source_doc_id_1: str = Field(description="First paper's source document ID")
+    source_doc_id_2: str = Field(description="Second paper's source document ID")
+
+class PaperSummary(BaseModel):
+    source_doc_id: str
+    journal: str
+    publish_year: int
+    total_chunks: int
+    summary: str
+    doi: Optional[str] = None
+
+class CompareResponse(BaseModel):
+    paper1_summary: PaperSummary
+    paper2_summary: PaperSummary
+    comparison: str
+    request_info: dict
+
 class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None 
