@@ -100,12 +100,97 @@ GET /api/stats
 ```
 Get vector store statistics.
 
+### 7. Popular Papers (NEW)
+```
+GET /api/popular
+```
+Get the most popular chunks based on usage tracking.
+
+**Response:**
+```json
+{
+  "popular_chunks": [
+    {
+      "chunk_id": "mucuna_01_intro",
+      "usage_count": 15,
+      "last_accessed": "2024-01-15",
+      "source_doc_id": "extension_brief_mucuna.pdf"
+    }
+  ]
+}
+```
+
+### 8. Analytics (NEW)
+```
+GET /api/analytics
+```
+Get comprehensive usage analytics and statistics.
+
+**Response:**
+```json
+{
+  "total_chunks_accessed": 25,
+  "total_accesses": 150,
+  "most_popular": [
+    {
+      "chunk_id": "mucuna_01_intro",
+      "usage_count": 15,
+      "last_accessed": "2024-01-15",
+      "source_doc_id": "extension_brief_mucuna.pdf"
+    }
+  ],
+  "recent_activity": [
+    {
+      "chunk_id": "transformer_attention",
+      "usage_count": 8,
+      "last_accessed": "2024-01-15",
+      "source_doc_id": "1706.03762v7.pdf"
+    }
+  ]
+}
+```
+
+#### Analytics Metrics Explained:
+
+**`total_chunks_accessed`** = **Unique chunks**
+- **What it counts**: The number of different/unique chunks that have been accessed at least once
+- **Example**: If you access chunks A, B, C, D, E → `total_chunks_accessed = 5`
+
+**`total_accesses`** = **Total interactions**
+- **What it counts**: The sum of all usage counts across all chunks (total interactions)
+- **Example**: If chunk A was accessed 3 times, chunk B was accessed 2 times, and chunks C, D, E were accessed 1 time each → `total_accesses = 3 + 2 + 1 + 1 + 1 = 8`
+
+**Real-world Example:**
+```json
+Usage data:
+[
+  {"chunk_id": "chunk_A", "usage_count": 5},
+  {"chunk_id": "chunk_B", "usage_count": 3},
+  {"chunk_id": "chunk_C", "usage_count": 2},
+  {"chunk_id": "chunk_D", "usage_count": 1}
+]
+
+Results:
+- total_chunks_accessed: 4 (4 unique chunks accessed)
+- total_accesses: 11 (5 + 3 + 2 + 1 = 11 total interactions)
+```
+
+**Analytics Insights:**
+- **High accesses, low chunks**: Users repeatedly access the same popular content
+- **Similar numbers**: Users explore diverse content without much repetition
+- **Growing gap**: Some content is very popular while other content gets occasional access
+
+This helps understand both the **breadth** (diversity) and **depth** (intensity) of content usage patterns.
+
 ## Environment Variables
 - `OPENAI_API_KEY`: Required for paper comparison functionality
 - `OPENAI_CHAT_MODEL`: Chat model to use for summaries and comparisons (default: "gpt-3.5-turbo")
 - `OPENAI_MODEL`: Embedding model for similarity search (default: "text-embedding-ada-002")
 - `CHROMA_DB_PATH`: Path to ChromaDB storage
 - `CHROMA_COLLECTION_NAME`: Collection name for vector storage
+- `REDIS_HOST`: Redis server host (default: "localhost")
+- `REDIS_PORT`: Redis server port (default: 6379)
+- `REDIS_DB`: Redis database number (default: 2)
 
 ## Error Handling
 All endpoints return appropriate HTTP status codes:

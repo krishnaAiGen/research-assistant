@@ -206,6 +206,47 @@ def test_compare_papers():
         print(f"Error: {response.text}")
     print()
 
+def test_popular_papers():
+    """Test getting popular papers"""
+    print("Testing popular papers endpoint...")
+    
+    response = requests.get(f"{BASE_URL}/api/popular")
+    print(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        result = response.json()
+        print(f"Popular chunks found: {len(result['popular_chunks'])}")
+        for i, chunk in enumerate(result['popular_chunks'][:3], 1):
+            print(f"  {i}. Chunk ID: {chunk['chunk_id']}")
+            print(f"     Source: {chunk['source_doc_id']}")
+            print(f"     Usage Count: {chunk['usage_count']}")
+            print(f"     Last Accessed: {chunk['last_accessed']}")
+    else:
+        print(f"Error: {response.text}")
+    print()
+
+def test_analytics():
+    """Test getting analytics"""
+    print("Testing analytics endpoint...")
+    
+    response = requests.get(f"{BASE_URL}/api/analytics")
+    print(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        result = response.json()
+        print(f"Total chunks accessed: {result['total_chunks_accessed']}")
+        print(f"Total accesses: {result['total_accesses']}")
+        print(f"Most popular chunks: {len(result['most_popular'])}")
+        print(f"Recent activity today: {len(result['recent_activity'])}")
+        
+        if result['most_popular']:
+            print("\nTop 3 most popular:")
+            for i, chunk in enumerate(result['most_popular'][:3], 1):
+                print(f"  {i}. {chunk['chunk_id']} - {chunk['usage_count']} accesses")
+    else:
+        print(f"Error: {response.text}")
+    print()
+
 if __name__ == "__main__":
     print("Research Assistant API Test Script")
     print("=" * 40)
@@ -216,6 +257,8 @@ if __name__ == "__main__":
     test_similarity_search()
     test_get_document()
     test_stats()
+    test_popular_papers()
+    test_analytics()
     test_compare_papers()
     
     print("Test completed!") 
