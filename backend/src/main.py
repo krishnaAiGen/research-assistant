@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
@@ -9,23 +9,38 @@ from pathlib import Path
 from dotenv import load_dotenv
 from typing import List
 from openai import OpenAI
+from datetime import datetime
 
 try:
     from .models import (
         UploadRequest, UploadResponse, SimilaritySearchRequest, 
         SimilaritySearchResponse, JournalDocument, ErrorResponse,
-        CompareRequest, CompareResponse, PaperSummary
+        CompareRequest, CompareResponse, PaperSummary,
+        TokenRequest, TokenResponse
     )
     from .embeddings import EmbeddingGenerator
     from .vector_store import ChromaVectorStore
+    from .usage_tracker import RedisUsageTracker
+    from .auth import (
+        require_upload_permission, require_analytics_permission, 
+        require_popular_permission, create_access_token, 
+        TokenData, UserRole, ROLE_PERMISSIONS, JWT_EXPIRATION_HOURS
+    )
 except ImportError:
     from models import (
         UploadRequest, UploadResponse, SimilaritySearchRequest, 
         SimilaritySearchResponse, JournalDocument, ErrorResponse,
-        CompareRequest, CompareResponse, PaperSummary
+        CompareRequest, CompareResponse, PaperSummary,
+        TokenRequest, TokenResponse
     )
     from embeddings import EmbeddingGenerator
     from vector_store import ChromaVectorStore
+    from usage_tracker import RedisUsageTracker
+    from auth import (
+        require_upload_permission, require_analytics_permission, 
+        require_popular_permission, create_access_token, 
+        TokenData, UserRole, ROLE_PERMISSIONS, JWT_EXPIRATION_HOURS
+    )
 
 load_dotenv()
 
@@ -51,6 +66,7 @@ app.add_middleware(
 # Initialize services
 embedding_generator = EmbeddingGenerator()
 vector_store = ChromaVectorStore()
+usage_tracker = RedisUsageTracker()
 
 @app.get("/")
 async def root():
@@ -63,8 +79,42 @@ async def get_stats():
     stats = vector_store.get_collection_stats()
     return stats
 
+@app.post("/api/auth/token", response_model=TokenResponse)
+async def create_token(request: TokenRequest):
+    """
+    Generate JWT access token for authentication.
+    For demo purposes - in production, this would validate user credentials.
+    """
+    try:
+        # Validate role
+        if request.role not in [UserRole.ADMIN, UserRole.ANALYTICS, UserRole.USER]:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid role. Must be one of: {UserRole.ADMIN}, {UserRole.ANALYTICS}, {UserRole.USER}"
+            )
+        
+        # Generate token
+        access_token = create_access_token(request.user_id, request.role)
+        permissions = ROLE_PERMISSIONS.get(request.role, [])
+        
+        return TokenResponse(
+            access_token=access_token,
+            token_type="bearer",
+            expires_in=JWT_EXPIRATION_HOURS * 3600,  # Convert hours to seconds
+            user_id=request.user_id,
+            role=request.role,
+            permissions=permissions
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating token: {str(e)}")
+
 @app.put("/api/upload", response_model=UploadResponse, status_code=202)
-async def upload_chunks(request: UploadRequest, background_tasks: BackgroundTasks):
+async def upload_chunks(
+    request: UploadRequest, 
+    background_tasks: BackgroundTasks,
+    current_user: TokenData = Depends(require_upload_permission())
+):
     """
     Upload journal chunks, local file path, or URL (including Google Drive), 
     generate embeddings, and store them in the vector database.
@@ -251,9 +301,12 @@ async def similarity_search(request: SimilaritySearchRequest):
             min_score=request.min_score
         )
         
-        # Convert to response format
+        # Convert to response format and track usage
         search_results = []
         for result in results:
+            # Track usage for this chunk
+            usage_tracker.update_usage(result["id"], result["source_doc_id"])
+            
             search_results.append({
                 "id": result["id"],
                 "source_doc_id": result["source_doc_id"],
@@ -278,6 +331,33 @@ async def similarity_search(request: SimilaritySearchRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error performing similarity search: {str(e)}")
 
+@app.get("/api/popular")
+async def get_popular_papers(current_user: TokenData = Depends(require_popular_permission())):
+    """Get most popular chunks based on usage tracking"""
+    try:
+        popular_chunks = usage_tracker.get_popular_chunks(limit=10)
+        return {"popular_chunks": popular_chunks}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving popular papers: {str(e)}")
+
+@app.get("/api/analytics")
+async def get_analytics(current_user: TokenData = Depends(require_analytics_permission())):
+    """Get comprehensive usage analytics"""
+    try:
+        all_stats = usage_tracker.get_all_usage_stats()
+        
+        # Get today's date for filtering recent activity
+        today = datetime.now().strftime("%Y-%m-%d")
+        
+        return {
+            "total_chunks_accessed": len(all_stats),
+            "total_accesses": sum(chunk["usage_count"] for chunk in all_stats),
+            "most_popular": all_stats[:5],
+            "recent_activity": [chunk for chunk in all_stats if chunk["last_accessed"] == today]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrieving analytics: {str(e)}")
+
 @app.get("/api/{journal_id}", response_model=JournalDocument)
 async def get_journal_document(journal_id: str):
     """
@@ -290,6 +370,10 @@ async def get_journal_document(journal_id: str):
         
         if not chunks:
             raise HTTPException(status_code=404, detail=f"Document with ID '{journal_id}' not found")
+        
+        # Track usage for all chunks in the document
+        for chunk in chunks:
+            usage_tracker.update_usage(chunk["id"], chunk["source_doc_id"])
         
         # Extract metadata from the first chunk
         first_chunk = chunks[0]
