@@ -174,6 +174,38 @@ def test_stats():
     print(f"Response: {response.json()}")
     print()
 
+def test_compare_papers():
+    """Test comparing two papers"""
+    print("Testing paper comparison...")
+    
+    # Test with two different document IDs
+    # You'll need to replace these with actual source_doc_ids from your database
+    compare_data = {
+        "source_doc_id_1": "extension_brief_mucuna.pdf",
+        "source_doc_id_2": "another_paper_id.pdf"  # Replace with actual ID
+    }
+    
+    print(f"Comparing papers: {compare_data['source_doc_id_1']} vs {compare_data['source_doc_id_2']}")
+    
+    response = requests.post(f"{BASE_URL}/api/compare", json=compare_data)
+    print(f"Status: {response.status_code}")
+    
+    if response.status_code == 200:
+        result = response.json()
+        print("Comparison Results:")
+        print(f"Paper 1: {result['paper1_summary']['journal']} ({result['paper1_summary']['publish_year']})")
+        print(f"Summary 1: {result['paper1_summary']['summary'][:200]}...")
+        print()
+        print(f"Paper 2: {result['paper2_summary']['journal']} ({result['paper2_summary']['publish_year']})")
+        print(f"Summary 2: {result['paper2_summary']['summary'][:200]}...")
+        print()
+        print(f"Comparison: {result['comparison'][:300]}...")
+        print()
+        print(f"Model used: {result['request_info']['model_used']}")
+    else:
+        print(f"Error: {response.text}")
+    print()
+
 if __name__ == "__main__":
     print("Research Assistant API Test Script")
     print("=" * 40)
@@ -184,5 +216,6 @@ if __name__ == "__main__":
     test_similarity_search()
     test_get_document()
     test_stats()
+    test_compare_papers()
     
     print("Test completed!") 

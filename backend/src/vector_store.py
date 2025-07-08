@@ -175,6 +175,36 @@ class ChromaVectorStore:
         except Exception as e:
             print(f"Error retrieving document chunks: {str(e)}")
             return []
+
+    def get_document_full_text(self, source_doc_id: str) -> Dict[str, Any]:
+        """
+        Get the full text of a document by concatenating all chunks
+        """
+        try:
+            chunks = self.get_document_chunks(source_doc_id)
+            
+            if not chunks:
+                return None
+            
+            # Concatenate all chunk texts in order
+            full_text = "\n\n".join([chunk["text"] for chunk in chunks])
+            
+            # Get metadata from first chunk
+            first_chunk = chunks[0]
+            
+            return {
+                "source_doc_id": source_doc_id,
+                "journal": first_chunk["journal"],
+                "publish_year": first_chunk["publish_year"],
+                "total_chunks": len(chunks),
+                "full_text": full_text,
+                "doi": first_chunk.get("doi"),
+                "link": first_chunk["link"]
+            }
+            
+        except Exception as e:
+            print(f"Error retrieving document full text: {str(e)}")
+            return None
     
     def get_collection_stats(self) -> Dict[str, Any]:
         """
