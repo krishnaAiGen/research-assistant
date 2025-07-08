@@ -92,6 +92,18 @@ class CompareResponse(BaseModel):
     comparison: str
     request_info: dict
 
+class TokenRequest(BaseModel):
+    user_id: str = Field(description="User identifier")
+    role: str = Field(description="User role: admin, analytics, or user")
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user_id: str
+    role: str
+    permissions: List[str]
+
 class ErrorResponse(BaseModel):
     error: str
     detail: Optional[str] = None 
