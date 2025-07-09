@@ -89,7 +89,6 @@ REDIS_PORT=6379
 REDIS_DB=2
 
 # JWT Authentication
-JWT_SECRET_KEY=your-super-secret-jwt-key
 JWT_EXPIRATION_HOURS=24
 
 # Server Configuration

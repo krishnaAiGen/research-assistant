@@ -194,3 +194,7 @@ temp/
 
 # Turbo
 .turbo 
+
+# Redis database dump files
+*.rdb
+dump.rdb
