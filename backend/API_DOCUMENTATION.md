@@ -5,6 +5,39 @@ The Research Assistant API provides endpoints for uploading research papers, per
 
 **Authentication**: Some endpoints require JWT token authentication with role-based access control.
 
+## ⚠️ Important: API Usage Workflow
+
+**Before using any search or analysis features, you MUST follow this sequence:**
+
+1. **Get Authentication Token**: Use `/api/auth/token` to generate a JWT token with admin role
+2. **Upload Data First**: Use `/api/upload` with the token to upload research papers and create embeddings
+3. **Use Other APIs**: Only after uploading data can you use search, comparison, and analytics features
+
+**Why this sequence is required:**
+- The vector database starts empty
+- Search APIs (`/api/similarity_search`) will return no results without uploaded data
+- Comparison APIs (`/api/compare`) need existing documents to compare
+- Analytics APIs (`/api/analytics`) track usage of uploaded documents
+
+### Quick Start Example:
+```bash
+# Step 1: Get token
+curl -X POST "http://localhost:8000/api/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "admin", "role": "admin"}'
+
+# Step 2: Upload data (replace YOUR_TOKEN_HERE with actual token)
+curl -X PUT "http://localhost:8000/api/upload" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{"file_path": "path/to/papers.json", "schema_version": "1.0"}'
+
+# Step 3: Now you can search
+curl -X POST "http://localhost:8000/api/similarity_search" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "machine learning", "k": 5}'
+```
+
 ## Base URL
 ```
 http://localhost:8000
@@ -130,6 +163,8 @@ Content-Type: application/json
 GET /api/stats
 ```
 **Authentication**: None required
+
+**Note**: This endpoint shows database statistics including total chunks count. It will show 0 chunks if no data has been uploaded yet.
 
 **Request**: No parameters required
 
@@ -273,6 +308,8 @@ POST /api/similarity_search
 ```
 **Authentication**: None required
 
+**⚠️ Prerequisites**: You must first upload data using `/api/upload` endpoint. This endpoint will return empty results if no data has been uploaded to the vector database.
+
 **Request Headers:**
 ```
 Content-Type: application/json
@@ -355,6 +392,8 @@ Content-Type: application/json
 GET /api/{source_doc_id}
 ```
 **Authentication**: None required
+
+**⚠️ Prerequisites**: You must first upload documents using `/api/upload` endpoint. This endpoint will return 404 if the document hasn't been uploaded.
 
 **Path Parameters:**
 - `source_doc_id` (string): The source document identifier
@@ -441,6 +480,8 @@ GET /api/extension_brief_mucuna.pdf
 POST /api/compare
 ```
 **Authentication**: None required
+
+**⚠️ Prerequisites**: You must first upload documents using `/api/upload` endpoint. Both papers must exist in the database before comparison.
 
 **Request Headers:**
 ```
@@ -532,6 +573,8 @@ GET /api/popular
 ```
 **Authentication**: Required (admin or analytics role)
 
+**⚠️ Prerequisites**: You must first upload documents using `/api/upload` endpoint. This endpoint tracks usage of uploaded documents.
+
 **Request Headers:**
 ```
 Authorization: Bearer <jwt_token>
@@ -585,6 +628,8 @@ Authorization: Bearer <jwt_token>
 GET /api/analytics
 ```
 **Authentication**: Required (admin or analytics role)
+
+**⚠️ Prerequisites**: You must first upload documents using `/api/upload` endpoint. This endpoint provides analytics on uploaded document usage.
 
 **Request Headers:**
 ```

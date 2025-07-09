@@ -106,17 +106,22 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ## API Endpoints
 
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| GET | `/` | Health check | None |
-| POST | `/api/auth/token` | Generate JWT token | None |
-| GET | `/api/stats` | Database statistics | None |
-| PUT | `/api/upload` | Upload papers | 🔒 Admin |
-| POST | `/api/similarity_search` | Search papers | None |
-| GET | `/api/{doc_id}` | Get document | None |
-| POST | `/api/compare` | Compare papers | None |
-| GET | `/api/popular` | Popular papers | 🔒 Analytics |
-| GET | `/api/analytics` | Usage analytics | 🔒 Analytics |
+| Method | Endpoint | Description | Auth | Requires Data |
+|--------|----------|-------------|------|---------------|
+| GET | `/` | Health check | None | No |
+| POST | `/api/auth/token` | Generate JWT token | None | No |
+| GET | `/api/stats` | Database statistics | None | No |
+| PUT | `/api/upload` | Upload papers & create embeddings | 🔒 Admin | **First Step** |
+| POST | `/api/similarity_search` | Search papers | None | ✅ Yes |
+| GET | `/api/{doc_id}` | Get document | None | ✅ Yes |
+| POST | `/api/compare` | Compare papers | None | ✅ Yes |
+| GET | `/api/popular` | Popular papers | 🔒 Analytics | ✅ Yes |
+| GET | `/api/analytics` | Usage analytics | 🔒 Analytics | ✅ Yes |
+
+**Legend:**
+- 🔒 **Auth**: Requires JWT token
+- ✅ **Requires Data**: Only works after uploading data via `/api/upload`
+- **First Step**: This must be done before using other APIs
 
 ## Testing
 
@@ -151,13 +156,39 @@ curl -X POST "http://localhost:8000/api/auth/token" \
 - **Authentication**: JWT tokens with role-based permissions
 - **Deployment**: Docker support (optional)
 
-## Usage
+## Usage Workflow
+
+### ⚠️ Important: Required Setup Steps
+
+**Before using any search or analysis features, you MUST:**
 
 1. **Start Services**: Redis → Backend → Frontend
-2. **Get Token**: Generate admin token via `/api/auth/token`
-3. **Upload Data**: Use token to upload papers via `/api/upload`
-4. **Search**: Query papers via `/api/similarity_search`
-5. **Analytics**: View usage stats via `/api/analytics`
+2. **Get Authentication Token**: Generate admin token via `/api/auth/token`
+3. **Upload Data First**: Use token to upload papers via `/api/upload` to create embeddings
+4. **Then Use Other APIs**: After data is uploaded, you can use search and analysis features
+
+### Step-by-Step Guide
+
+#### Step 1: Get Authentication Token
+```bash
+curl -X POST "http://localhost:8000/api/auth/token" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "admin", "role": "admin"}'
+```
+
+#### Step 2: Upload Research Papers (Required)
+```bash
+curl -X PUT "http://localhost:8000/api/upload" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -H "Content-Type: application/json" \
+  -d '{"file_path": "path/to/your/papers.json", "schema_version": "1.0"}'
+```
+
+#### Step 3: Use Search and Analysis APIs
+Only after uploading data, you can:
+- **Search**: Query papers via `/api/similarity_search`
+- **Analytics**: View usage stats via `/api/analytics`
+- **Compare**: Compare papers via `/api/compare`
 
 ## Documentation
 
